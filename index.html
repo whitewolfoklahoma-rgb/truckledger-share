@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TruckLedger — Food Truck Event Profit &amp; Food-Cost Book</title>
+<style>
+  :root{
+    --brand:#c1440e; --brand-dark:#8f3108; --brand-light:#fdeee4;
+    --amber:#e07b24; --ink:#26211d; --muted:#6f6a63; --line:#e3d9d0;
+    --bg:#faf6f1; --card:#ffffff; --red:#b3261e; --green:#2e7d32; --blue:#1565c0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.45}
+  header{background:var(--brand-dark);color:#fff;padding:14px 16px}
+  header h1{margin:0;font-size:22px}
+  header p{margin:2px 0 0;font-size:13px;opacity:.88}
+  nav{display:flex;flex-wrap:wrap;gap:6px;background:var(--brand);padding:8px 12px;position:sticky;top:0;z-index:10}
+  nav button{background:transparent;border:1px solid rgba(255,255,255,.45);color:#fff;padding:7px 12px;border-radius:20px;cursor:pointer;font-size:14px}
+  nav button.active{background:#fff;color:var(--brand-dark);font-weight:600}
+  main{max-width:980px;margin:0 auto;padding:16px 12px 60px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:16px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+  .card h2{margin:0 0 8px;font-size:18px;color:var(--brand-dark)}
+  .card h3{margin:14px 0 6px;font-size:16px;color:var(--brand-dark)}
+  .hint{color:var(--muted);font-size:13px;margin:4px 0 10px}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{border-bottom:1px solid var(--line);padding:6px 6px;text-align:left;vertical-align:middle}
+  th{color:var(--brand-dark);font-size:13px;text-transform:uppercase;letter-spacing:.03em}
+  td.num,th.num{text-align:right}
+  tr.total td{font-weight:700;border-top:2px solid var(--brand);border-bottom:none}
+  input[type=text],input[type=number],input[type=date],select,textarea{width:100%;padding:6px 7px;border:1px solid #c9beb2;border-radius:6px;font-size:14px;background:#fff;font-family:inherit}
+  input[type=number]{text-align:right}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .row>div{flex:1;min-width:130px}
+  label{font-size:12px;color:var(--muted);display:block;margin-bottom:2px}
+  .btn{background:var(--brand);color:#fff;border:none;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:14px}
+  .btn:hover{background:var(--brand-dark)}
+  .btn.secondary{background:#fff;color:var(--brand-dark);border:1px solid var(--brand)}
+  .btn.danger{background:#fff;color:var(--red);border:1px solid var(--red);padding:5px 10px;font-size:13px}
+  .btn.small{padding:5px 10px;font-size:13px;min-height:40px;}
+  .kpis{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+  .kpi{flex:1;min-width:140px;background:var(--brand-light);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .kpi .v{font-size:21px;font-weight:700;color:var(--brand-dark)}
+  .kpi .l{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  .good{color:var(--green);font-weight:600}
+  .bad{color:var(--red);font-weight:600}
+  .warn{color:var(--amber);font-weight:600}
+  .pill{display:inline-block;padding:1px 8px;border-radius:12px;font-size:12px;font-weight:600}
+  .pill.g{background:#e6f4ea;color:var(--green)}
+  .pill.r{background:#fdecea;color:var(--red)}
+  .pill.a{background:#fef3e2;color:#9a5b00}
+  .tab{display:none}
+  .tab.active{display:block}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .scrollx{overflow-x:auto}
+  @media (max-width:560px){ .kpi{min-width:calc(50% - 6px)} th,td{padding:5px 4px;font-size:13px} }
+  @media print{
+    nav, .no-print, form, .btn{display:none !important}
+    body{background:#fff}
+    .tab{display:block !important}
+    .card{box-shadow:none;break-inside:avoid}
+    main{max-width:none;padding:0}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>🚚 TruckLedger</h1>
+  <p>Food truck event profit, profit-per-hour rankings &amp; weekly food-cost % — one file, no subscription, works offline.</p>
+</header>
+<nav id="topnav">
+  <button data-tab="dashboard" class="active">Dashboard</button>
+  <button data-tab="events">Events</button>
+  <button data-tab="rankings">Event Rankings</button>
+  <button data-tab="foodcost">Food Cost %</button>
+  <button data-tab="menu">Menu Costing</button>
+  <button data-tab="expenses">Expenses &amp; Taxes</button>
+  <button data-tab="help">Help &amp; Backup</button>
+</nav>
+<main>
+
+<!-- ============ DASHBOARD ============ -->
+<section id="tab-dashboard" class="tab active">
+  <div class="card">
+    <h2 id="dash-title">Season at a glance</h2>
+    <div class="kpis" id="dash-kpis"></div>
+    <p class="hint" id="dash-note"></p>
+  </div>
+  <div class="card">
+    <h3>Best &amp; worst events by profit per hour</h3>
+    <div id="dash-bestworst"></div>
+  </div>
+  <div class="card no-print">
+    <h3>Print a season summary</h3>
+    <p class="hint">Prints the dashboard, rankings, food-cost history and the Schedule C summary — handy for your records or your tax preparer.</p>
+    <button class="btn" onclick="window.print()">🖨️ Print / Save PDF</button>
+  </div>
+</section>
+
+<!-- ============ EVENTS ============ -->
+<section id="tab-events" class="tab">
+  <div class="card no-print">
+    <h2 id="event-form-title">Log an event</h2>
+    <p class="hint">One row per service: a lunch stop, a festival, a catering gig. Profit and profit-per-hour are figured for you — card fees come from the % of sales paid by card and your processor rate.</p>
+    <form id="event-form">
+      <input type="hidden" id="ev-id">
+      <div class="row">
+        <div style="flex:2;min-width:180px"><label>Event name (use the same name for recurring stops)</label><input type="text" id="ev-name" required placeholder="e.g. Downtown Lunch"></div>
+        <div><label>Date</label><input type="date" id="ev-date" required></div>
+        <div><label>Location (optional)</label><input type="text" id="ev-location" placeholder="e.g. 5th &amp; Main"></div>
+      </div>
+      <div class="row">
+        <div><label>Total hours (incl. prep &amp; travel)</label><input inputmode="decimal" type="number" id="ev-hours" min="0" step="0.25" value="0"></div>
+        <div><label>Gross sales ($)</label><input inputmode="decimal" type="number" id="ev-sales" min="0" step="0.01" value="0"></div>
+        <div><label>Food &amp; paper cost for this event ($)</label><input inputmode="decimal" type="number" id="ev-food" min="0" step="0.01" value="0"></div>
+      </div>
+      <div class="row">
+        <div><label>Event / booth fee ($)</label><input inputmode="decimal" type="number" id="ev-booth" min="0" step="0.01" value="0"></div>
+        <div><label>Commissary ($)</label><input inputmode="decimal" type="number" id="ev-commissary" min="0" step="0.01" value="0"></div>
+        <div><label>Propane ($)</label><input inputmode="decimal" type="number" id="ev-propane" min="0" step="0.01" value="0"></div>
+        <div><label>Fuel ($)</label><input inputmode="decimal" type="number" id="ev-fuel" min="0" step="0.01" value="0"></div>
+      </div>
+      <div class="row">
+        <div><label>Paid help — hours</label><input inputmode="decimal" type="number" id="ev-laborhours" min="0" step="0.25" value="0"></div>
+        <div><label>Paid help — rate ($/hr)</label><input inputmode="decimal" type="number" id="ev-laborrate" min="0" step="0.01" value="0"></div>
+        <div><label>% of sales paid by card</label><input inputmode="decimal" type="number" id="ev-cardshare" min="0" max="100" step="1" value="70"></div>
+        <div><label>Card fee rate (%)</label><input inputmode="decimal" type="number" id="ev-cardfee" min="0" step="0.01" value="2.9"></div>
+        <div><label>Other costs ($)</label><input inputmode="decimal" type="number" id="ev-other" min="0" step="0.01" value="0"></div>
+      </div>
+      <div class="actions">
+        <button type="submit" class="btn" id="ev-submit">Add event</button>
+        <button type="button" class="btn secondary" id="ev-cancel" style="display:none">Cancel edit</button>
+      </div>
+    </form>
+  </div>
+  <div class="card">
+    <h3>Logged events</h3>
+    <div class="scrollx"><div id="event-list"></div></div>
+  </div>
+</section>
+
+<!-- ============ RANKINGS ============ -->
+<section id="tab-rankings" class="tab">
+  <div class="card">
+    <h2>Which events are worth rebooking?</h2>
+    <p class="hint">Recurring stops are grouped by name. Verdicts compare average profit per hour against your target (set it in Help &amp; Backup — the default is $40/hr): at or above target = <b>Rebook</b>, within 25% under = <b>Borderline</b>, below that = <b>Skip</b>. A big-sales event that eats 10 hours can still be a bad event — profit per hour is the honest number.</p>
+    <div class="scrollx"><div id="ranking-list"></div></div>
+  </div>
+</section>
+
+<!-- ============ FOOD COST ============ -->
+<section id="tab-foodcost" class="tab">
+  <div class="card no-print">
+    <h2>Weekly food-cost worksheet</h2>
+    <p class="hint">The worksheet the trade swears by, done weekly so a cost creep shows up in days, not at month-end: <b>Food cost = beginning inventory + purchases − ending inventory</b>, and <b>Food-cost % = food cost ÷ food sales</b>. Target band is set in Help &amp; Backup (default 27–32%).</p>
+    <form id="week-form">
+      <input type="hidden" id="wk-id">
+      <div class="row">
+        <div><label>Week starting</label><input type="date" id="wk-start" required></div>
+        <div><label>Beginning inventory ($)</label><input inputmode="decimal" type="number" id="wk-bi" min="0" step="0.01" value="0"></div>
+        <div><label>Purchases ($)</label><input inputmode="decimal" type="number" id="wk-purch" min="0" step="0.01" value="0"></div>
+      </div>
+      <div class="row">
+        <div><label>Ending inventory ($)</label><input inputmode="decimal" type="number" id="wk-ei" min="0" step="0.01" value="0"></div>
+        <div><label>Food sales that week ($)</label><input inputmode="decimal" type="number" id="wk-sales" min="0" step="0.01" value="0"></div>
+      </div>
+      <div class="actions">
+        <button type="submit" class="btn" id="wk-submit">Add week</button>
+        <button type="button" class="btn secondary" id="wk-cancel" style="display:none">Cancel edit</button>
+      </div>
+    </form>
+  </div>
+  <div class="card">
+    <h3>Week by week</h3>
+    <div class="scrollx"><div id="week-list"></div></div>
+  </div>
+</section>
+
+<!-- ============ MENU ============ -->
+<section id="tab-menu" class="tab">
+  <div class="card no-print">
+    <h2>Menu-item costing</h2>
+    <p class="hint">Plate cost = what one serving actually costs you in ingredients and disposables. If an item's food-cost % sits above your band's top, it's a candidate for a price bump, a smaller portion, or the axe.</p>
+    <form id="menu-form">
+      <input type="hidden" id="mi-id">
+      <div class="row">
+        <div style="flex:2;min-width:160px"><label>Item name</label><input type="text" id="mi-name" required placeholder="e.g. Pulled Pork Sandwich"></div>
+        <div><label>Plate cost ($)</label><input inputmode="decimal" type="number" id="mi-cost" min="0" step="0.01" value="0"></div>
+        <div><label>Menu price ($)</label><input inputmode="decimal" type="number" id="mi-price" min="0" step="0.01" value="0"></div>
+      </div>
+      <div class="actions">
+        <button type="submit" class="btn" id="mi-submit">Add item</button>
+        <button type="button" class="btn secondary" id="mi-cancel" style="display:none">Cancel edit</button>
+      </div>
+    </form>
+  </div>
+  <div class="card">
+    <h3>Menu board</h3>
+    <div class="scrollx"><div id="menu-list"></div></div>
+  </div>
+</section>
+
+<!-- ============ EXPENSES ============ -->
+<section id="tab-expenses" class="tab">
+  <div class="card no-print">
+    <h2>Other expenses</h2>
+    <p class="hint">Costs that don't belong to a single event — commissary rent, permits, insurance, repairs. Event costs are already counted on the Events tab; don't double-enter them here. Every category is pre-mapped to its Schedule C line.</p>
+    <form id="expense-form">
+      <input type="hidden" id="ex-id">
+      <div class="row">
+        <div><label>Date</label><input type="date" id="ex-date" required></div>
+        <div style="flex:2;min-width:160px"><label>Description</label><input type="text" id="ex-desc" required placeholder="e.g. Commissary rent — November"></div>
+        <div><label>Category (Schedule C line)</label><select id="ex-cat"></select></div>
+        <div><label>Amount ($)</label><input inputmode="decimal" type="number" id="ex-amount" min="0" step="0.01" value="0"></div>
+      </div>
+      <div class="actions">
+        <button type="submit" class="btn" id="ex-submit">Add expense</button>
+        <button type="button" class="btn secondary" id="ex-cancel" style="display:none">Cancel edit</button>
+      </div>
+    </form>
+  </div>
+  <div class="card">
+    <h3>Expense log</h3>
+    <div class="scrollx"><div id="expense-list"></div></div>
+  </div>
+  <div class="card">
+    <h3>Schedule C summary (events + expenses)</h3>
+    <p class="hint">Planning aid for tax time — totals by Schedule C line, built from your event costs and expense log. Not tax advice; hand it to your preparer. (If your paid help are W-2 employees rather than contract help, their labor belongs on Line 26 wages instead of Line 11.)</p>
+    <div class="scrollx"><div id="tax-summary"></div></div>
+  </div>
+</section>
+
+<!-- ============ HELP ============ -->
+<section id="tab-help" class="tab">
+  <div class="card">
+    <h2>Settings</h2>
+    <div class="row">
+      <div style="flex:2;min-width:160px"><label>Truck / business name</label><input type="text" id="st-truck"></div>
+      <div><label>Rebook target ($/hr)</label><input inputmode="decimal" type="number" id="st-target" min="0" step="1"></div>
+    </div>
+    <div class="row">
+      <div><label>Default card fee rate (%)</label><input inputmode="decimal" type="number" id="st-cardfee" min="0" step="0.01"></div>
+      <div><label>Default % of sales by card</label><input inputmode="decimal" type="number" id="st-cardshare" min="0" max="100" step="1"></div>
+      <div><label>Default paid-help rate ($/hr)</label><input inputmode="decimal" type="number" id="st-laborrate" min="0" step="0.01"></div>
+    </div>
+    <div class="row">
+      <div><label>Food-cost target — low (%)</label><input inputmode="decimal" type="number" id="st-fcmin" min="0" max="100" step="0.5"></div>
+      <div><label>Food-cost target — high (%)</label><input inputmode="decimal" type="number" id="st-fcmax" min="0" max="100" step="0.5"></div>
+    </div>
+    <div class="actions"><button class="btn" id="st-save">Save settings</button></div>
+  </div>
+  <div class="card">
+    <h2>How TruckLedger works</h2>
+    <p><b>Events</b> are the heart of it. Log every service with its sales and its real costs; TruckLedger returns profit and profit per hour. Use the <b>same event name</b> for recurring stops ("Downtown Lunch") and the Rankings tab will average them, so one rainy Tuesday doesn't fool you.</p>
+    <p><b>Food cost</b> is a weekly habit: count inventory, add purchases, count again. Ten minutes a week beats a surprise at month-end — by the time a monthly P&amp;L shows food cost creeping, you're four to six weeks too late.</p>
+    <p><b>Menu costing</b> keeps the menu honest: price from plate cost, not from what the truck two spots down charges.</p>
+    <p><b>Your data</b> lives only in this browser's local storage, on this device. Nothing is uploaded. Back it up below before switching phones or browsers.</p>
+  </div>
+  <div class="card no-print">
+    <h2>Backup &amp; demo data</h2>
+    <div class="actions">
+      <button class="btn secondary" id="btn-export">⬇️ Export backup (JSON)</button>
+      <button class="btn secondary" id="btn-import">⬆️ Import backup</button>
+      <input type="file" id="file-import" accept=".json,application/json" style="display:none">
+      <button class="btn secondary" id="btn-demo">Reload demo data</button>
+      <button class="btn secondary" id="btn-clear-demo">Clear demo data only</button>
+      <button class="btn danger" id="btn-clear">Erase everything</button>
+    </div>
+    <p class="hint" id="backup-msg"></p>
+  </div>
+<div id="legalSection"></div>
+</section>
+
+</main>
+
+<script>
+"use strict";
+/* ================= utilities ================= */
+function num(v){ var n = parseFloat(v); return isFinite(n) ? n : 0; }
+function r2(n){ return Math.round((n + Number.EPSILON) * 100) / 100; }
+function money(n){ if(!isFinite(n)) n = 0; var neg = n < 0; var s = Math.abs(r2(n)).toLocaleString("en-US",{minimumFractionDigits:2, maximumFractionDigits:2}); return (neg ? "-$" : "$") + s; }
+function pct(n){ if(!isFinite(n)) n = 0; return r2(n).toFixed(2) + "%"; }
+function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+function fmtDate(d){ if(!d) return ""; var p = String(d).split("-"); if(p.length !== 3) return esc(d); return p[1] + "/" + p[2] + "/" + p[0]; }
+
+/* ================= categories (Schedule C) ================= */
+var CATEGORIES = [
+  {key:"advertising", label:"Advertising", line:"Line 8 — Advertising"},
+  {key:"vehicle",     label:"Vehicle & fuel", line:"Line 9 — Car and truck expenses"},
+  {key:"cardfees",    label:"Card / POS fees", line:"Line 10 — Commissions and fees"},
+  {key:"labor",       label:"Paid help (contract labor)", line:"Line 11 — Contract labor"},
+  {key:"insurance",   label:"Insurance", line:"Line 15 — Insurance (other than health)"},
+  {key:"office",      label:"Office expenses", line:"Line 18 — Office expenses"},
+  {key:"commissary",  label:"Commissary / kitchen rent", line:"Line 20b — Rent, other business property"},
+  {key:"repairs",     label:"Repairs & maintenance", line:"Line 21 — Repairs and maintenance"},
+  {key:"supplies",    label:"Supplies", line:"Line 22 — Supplies"},
+  {key:"permits",     label:"Permits & licenses", line:"Line 23 — Taxes and licenses"},
+  {key:"utilities",   label:"Utilities & propane", line:"Line 25 — Utilities"},
+  {key:"eventfees",   label:"Event & booth fees", line:"Line 27a — Other expenses"},
+  {key:"food",        label:"Food inventory purchases", line:"Part III — Cost of goods sold"},
+  {key:"other",       label:"Other", line:"Line 27a — Other expenses"}
+];
+function catByKey(k){ for(var i=0;i<CATEGORIES.length;i++){ if(CATEGORIES[i].key===k) return CATEGORIES[i]; } return CATEGORIES[CATEGORIES.length-1]; }
+
+/* ================= calculations (pure, testable) ================= */
+function calcEvent(e){
+  var sales = Math.max(0, num(e.sales));
+  var cardFees = r2(sales * (num(e.cardSharePct)/100) * (num(e.cardFeePct)/100));
+  var labor = r2(num(e.laborHours) * num(e.laborRate));
+  var parts = {
+    food: Math.max(0, num(e.foodCost)), booth: Math.max(0, num(e.boothFee)),
+    commissary: Math.max(0, num(e.commissary)), propane: Math.max(0, num(e.propane)),
+    fuel: Math.max(0, num(e.fuel)), labor: labor, cardFees: cardFees,
+    other: Math.max(0, num(e.otherCost))
+  };
+  var totalCost = r2(parts.food + parts.booth + parts.commissary + parts.propane + parts.fuel + parts.labor + parts.cardFees + parts.other);
+  var profit = r2(sales - totalCost);
+  var hours = Math.max(0, num(e.hours));
+  var perHour = hours > 0 ? r2(profit / hours) : 0;
+  return { sales:sales, parts:parts, totalCost:totalCost, profit:profit, hours:hours, perHour:perHour };
+}
+function calcWeek(w){
+  var cost = r2(num(w.bi) + num(w.purchases) - num(w.ei));
+  var sales = Math.max(0, num(w.sales));
+  var p = sales > 0 ? r2(cost / sales * 100) : 0;
+  return { cost:cost, sales:sales, pct:p };
+}
+function weekStatus(p, s){ if(p <= 0) return "none"; if(p < num(s.fcMin)) return "low"; if(p > num(s.fcMax)) return "high"; return "in"; }
+function calcMenuItem(m){
+  var cost = Math.max(0, num(m.plateCost)), price = Math.max(0, num(m.price));
+  var p = price > 0 ? r2(cost / price * 100) : 0;
+  return { cost:cost, price:price, pct:p, margin:r2(price - cost) };
+}
+function groupEvents(events){
+  var map = {}, order = [];
+  events.forEach(function(e){
+    var key = String(e.name || "Unnamed event").trim().toLowerCase();
+    if(!map[key]){ map[key] = { name:String(e.name || "Unnamed event").trim(), count:0, sales:0, profit:0, hours:0 }; order.push(key); }
+    var c = calcEvent(e);
+    map[key].count++; map[key].sales = r2(map[key].sales + c.sales); map[key].profit = r2(map[key].profit + c.profit); map[key].hours = r2(map[key].hours + c.hours);
+  });
+  return order.map(function(k){ var g = map[k]; g.perHour = g.hours > 0 ? r2(g.profit / g.hours) : 0; g.avgProfit = g.count > 0 ? r2(g.profit / g.count) : 0; return g; });
+}
+function verdict(perHour, target){
+  var t = num(target);
+  if(t <= 0) return {label:"—", cls:"a"};
+  if(perHour >= t) return {label:"Rebook", cls:"g"};
+  if(perHour >= t * 0.75) return {label:"Borderline", cls:"a"};
+  return {label:"Skip", cls:"r"};
+}
+function taxTotals(state){
+  var lines = {}; // line label -> amount
+  function add(line, amt){ lines[line] = r2((lines[line] || 0) + amt); }
+  state.events.forEach(function(e){
+    var c = calcEvent(e).parts;
+    add("Part III — Cost of goods sold", c.food);
+    add("Line 27a — Other expenses", r2(c.booth + c.other));
+    add("Line 20b — Rent, other business property", c.commissary);
+    add("Line 25 — Utilities", c.propane);
+    add("Line 9 — Car and truck expenses", c.fuel);
+    add("Line 11 — Contract labor", c.labor);
+    add("Line 10 — Commissions and fees", c.cardFees);
+  });
+  state.expenses.forEach(function(x){ add(catByKey(x.category).line, Math.max(0, num(x.amount))); });
+  return lines;
+}
+
+/* ================= state ================= */
+var LS_KEY = "truckledger_v1";
+var state = null;
+function defaultSettings(){ return { truckName:"The Rolling Fork", targetPerHour:40, cardFeePct:2.9, cardSharePct:70, laborRate:15, fcMin:27, fcMax:32 }; }
+function demoState(){
+  var s = defaultSettings();
+  return {
+    settings: s,
+    events: [
+      {id:"d1", name:"First Friday Art Walk", date:"2026-10-02", location:"Downtown Arts District", hours:8, sales:1240, foodCost:372, boothFee:75, commissary:40, propane:18, fuel:22, laborHours:5, laborRate:15, cardSharePct:75, cardFeePct:2.9, otherCost:10},
+      {id:"d2", name:"Downtown Lunch", date:"2026-10-06", location:"5th & Main", hours:5, sales:640, foodCost:205, boothFee:0, commissary:30, propane:12, fuel:14, laborHours:0, laborRate:15, cardSharePct:70, cardFeePct:2.9, otherCost:0},
+      {id:"d3", name:"Harvest Festival", date:"2026-10-10", location:"County Fairgrounds", hours:10, sales:980, foodCost:333, boothFee:150, commissary:40, propane:24, fuel:31, laborHours:8, laborRate:15, cardSharePct:80, cardFeePct:2.9, otherCost:15},
+      {id:"d4", name:"Downtown Lunch", date:"2026-10-13", location:"5th & Main", hours:5, sales:585, foodCost:187, boothFee:0, commissary:30, propane:12, fuel:14, laborHours:0, laborRate:15, cardSharePct:70, cardFeePct:2.9, otherCost:5}
+    ],
+    weeks: [
+      {id:"w1", start:"2026-09-28", bi:420, purchases:690, ei:350, sales:2380},
+      {id:"w2", start:"2026-10-05", bi:350, purchases:815, ei:290, sales:2510},
+      {id:"w3", start:"2026-10-12", bi:290, purchases:640, ei:310, sales:2190}
+    ],
+    menu: [
+      {id:"m1", name:"Smoked Brisket Plate", plateCost:4.85, price:15},
+      {id:"m2", name:"Pulled Pork Sandwich", plateCost:3.10, price:11},
+      {id:"m3", name:"Loaded Fries", plateCost:1.95, price:8},
+      {id:"m4", name:"Sweet Tea (cup)", plateCost:0.42, price:3}
+    ],
+    expenses: [
+      {id:"x1", date:"2026-10-01", desc:"Commissary rent — October", category:"commissary", amount:450},
+      {id:"x2", date:"2026-10-03", desc:"County health permit renewal", category:"permits", amount:185},
+      {id:"x3", date:"2026-10-08", desc:"Propane tank refill (spare tank)", category:"utilities", amount:64},
+      {id:"x4", date:"2026-10-09", desc:"Flyers for festival season", category:"advertising", amount:58},
+      {id:"x5", date:"2026-10-11", desc:"Generator oil change", category:"repairs", amount:42}
+    ]
+  };
+}
+function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(err){} }
+function load(){
+  try{
+    var raw = localStorage.getItem(LS_KEY);
+    if(raw){ var parsed = JSON.parse(raw); if(parsed && parsed.settings && Array.isArray(parsed.events)){ state = parsed; return; } }
+  }catch(err){}
+  state = demoState(); save();
+}
+
+/* ================= rendering ================= */
+function $(id){ return document.getElementById(id); }
+function seasonTotals(){
+  var t = { events:0, sales:0, profit:0, hours:0 };
+  state.events.forEach(function(e){ var c = calcEvent(e); t.events++; t.sales = r2(t.sales + c.sales); t.profit = r2(t.profit + c.profit); t.hours = r2(t.hours + c.hours); });
+  t.perHour = t.hours > 0 ? r2(t.profit / t.hours) : 0;
+  return t;
+}
+function renderDashboard(){
+  var s = state.settings, t = seasonTotals();
+  $("dash-title").textContent = (s.truckName ? s.truckName + " — " : "") + "Season at a glance";
+  var fcHtml = "<span class='l'>Food cost % (all weeks)</span>";
+  var wCost = 0, wSales = 0;
+  state.weeks.forEach(function(w){ var c = calcWeek(w); wCost = r2(wCost + c.cost); wSales = r2(wSales + c.sales); });
+  var fcPct = wSales > 0 ? r2(wCost / wSales * 100) : 0;
+  var fcCls = state.weeks.length ? (weekStatus(fcPct, s) === "high" ? "bad" : "good") : "";
+  $("dash-kpis").innerHTML =
+    "<div class='kpi'><div class='v'>" + t.events + "</div><div class='l'>Events logged</div></div>" +
+    "<div class='kpi'><div class='v'>" + money(t.sales) + "</div><div class='l'>Gross sales</div></div>" +
+    "<div class='kpi'><div class='v'>" + money(t.profit) + "</div><div class='l'>Event profit</div></div>" +
+    "<div class='kpi'><div class='v'>" + money(t.perHour) + "/hr</div><div class='l'>Avg profit / hour</div></div>" +
+    "<div class='kpi'><div class='v " + fcCls + "'>" + (state.weeks.length ? pct(fcPct) : "—") + "</div>" + fcHtml + "</div>";
+  $("dash-note").textContent = t.events === 0 ? "No events logged yet — add your first service on the Events tab." :
+    "Target is " + money(num(s.targetPerHour)) + "/hr. " + (t.perHour >= num(s.targetPerHour) ? "Your season average is beating it. 🎉" : "Your season average is under target — check the Rankings tab for the stops dragging it down.");
+  if(state.events.length === 0){ $("dash-bestworst").innerHTML = "<p class='hint'>Nothing to rank yet.</p>"; return; }
+  var sorted = state.events.map(function(e){ return { name:e.name, date:e.date, c:calcEvent(e) }; }).sort(function(a,b){ return b.c.perHour - a.c.perHour; });
+  var rows = "";
+  var picks = [sorted[0], sorted[sorted.length-1]];
+  var labels = ["🏆 Best", "🔻 Worst"];
+  for(var i=0;i<2;i++){ var p = picks[i]; if(!p) continue; if(i===1 && sorted.length===1) continue;
+    rows += "<tr><td>" + labels[i] + "</td><td>" + esc(p.name) + "</td><td>" + fmtDate(p.date) + "</td><td class='num'>" + money(p.c.profit) + "</td><td class='num'>" + money(p.c.perHour) + "/hr</td></tr>"; }
+  $("dash-bestworst").innerHTML = "<table><tr><th></th><th>Event</th><th>Date</th><th class='num'>Profit</th><th class='num'>Profit/hr</th></tr>" + rows + "</table>";
+}
+function renderEvents(){
+  var el = $("event-list");
+  if(state.events.length === 0){ el.innerHTML = "<p class='hint'>No events yet. Log your first service above.</p>"; return; }
+  var sorted = state.events.slice().sort(function(a,b){ return String(b.date).localeCompare(String(a.date)); });
+  var rows = sorted.map(function(e){
+    var c = calcEvent(e);
+    return "<tr><td>" + fmtDate(e.date) + "</td><td>" + esc(e.name) + (e.location ? "<br><span class='hint'>" + esc(e.location) + "</span>" : "") + "</td>" +
+      "<td class='num'>" + c.hours + "</td><td class='num'>" + money(c.sales) + "</td><td class='num'>" + money(c.totalCost) + "</td>" +
+      "<td class='num'><b>" + money(c.profit) + "</b></td><td class='num'>" + money(c.perHour) + "</td>" +
+      "<td class='no-print'><button class='btn small secondary' onclick='editEvent(\"" + e.id + "\")'>Edit</button> <button class='btn danger' onclick='delEvent(\"" + e.id + "\")'>Delete</button></td></tr>";
+  }).join("");
+  var t = seasonTotals();
+  el.innerHTML = "<table><tr><th>Date</th><th>Event</th><th class='num'>Hrs</th><th class='num'>Sales</th><th class='num'>Costs</th><th class='num'>Profit</th><th class='num'>$/hr</th><th class='no-print'></th></tr>" + rows +
+    "<tr class='total'><td colspan='2'>Season totals</td><td class='num'>" + t.hours + "</td><td class='num'>" + money(t.sales) + "</td><td class='num'>" + money(r2(t.sales - t.profit)) + "</td><td class='num'>" + money(t.profit) + "</td><td class='num'>" + money(t.perHour) + "</td><td class='no-print'></td></tr></table>";
+}
+function renderRankings(){
+  var el = $("ranking-list"), s = state.settings;
+  var groups = groupEvents(state.events);
+  if(groups.length === 0){ el.innerHTML = "<p class='hint'>No events logged yet.</p>"; return; }
+  groups.sort(function(a,b){ return b.perHour - a.perHour; });
+  var rows = groups.map(function(g){
+    var v = verdict(g.perHour, s.targetPerHour);
+    return "<tr><td>" + esc(g.name) + "</td><td class='num'>" + g.count + "</td><td class='num'>" + money(g.sales) + "</td><td class='num'>" + money(g.avgProfit) + "</td><td class='num'><b>" + money(g.perHour) + "</b></td><td><span class='pill " + v.cls + "'>" + v.label + "</span></td></tr>";
+  }).join("");
+  el.innerHTML = "<table><tr><th>Event / stop</th><th class='num'>Times run</th><th class='num'>Total sales</th><th class='num'>Avg profit</th><th class='num'>Avg $/hr</th><th>Verdict</th></tr>" + rows + "</table>";
+}
+function renderWeeks(){
+  var el = $("week-list"), s = state.settings;
+  if(state.weeks.length === 0){ el.innerHTML = "<p class='hint'>No weeks yet. Count inventory Sunday night, add the week above.</p>"; return; }
+  var sorted = state.weeks.slice().sort(function(a,b){ return String(a.start).localeCompare(String(b.start)); });
+  var tc = 0, ts = 0;
+  var rows = sorted.map(function(w){
+    var c = calcWeek(w); tc = r2(tc + c.cost); ts = r2(ts + c.sales);
+    var st = weekStatus(c.pct, s);
+    var pill = st === "in" ? "<span class='pill g'>In band</span>" : st === "high" ? "<span class='pill r'>Over — check portions &amp; prices</span>" : st === "low" ? "<span class='pill a'>Under band — double-check the count</span>" : "—";
+    return "<tr><td>" + fmtDate(w.start) + "</td><td class='num'>" + money(w.bi) + "</td><td class='num'>" + money(w.purchases) + "</td><td class='num'>" + money(w.ei) + "</td><td class='num'>" + money(c.cost) + "</td><td class='num'>" + money(c.sales) + "</td><td class='num'><b>" + pct(c.pct) + "</b></td><td>" + pill + "</td>" +
+      "<td class='no-print'><button class='btn small secondary' onclick='editWeek(\"" + w.id + "\")'>Edit</button> <button class='btn danger' onclick='delWeek(\"" + w.id + "\")'>Delete</button></td></tr>";
+  }).join("");
+  var overall = ts > 0 ? r2(tc / ts * 100) : 0;
+  el.innerHTML = "<table><tr><th>Week of</th><th class='num'>Begin inv.</th><th class='num'>Purchases</th><th class='num'>End inv.</th><th class='num'>Food cost</th><th class='num'>Sales</th><th class='num'>Food %</th><th>Status</th><th class='no-print'></th></tr>" + rows +
+    "<tr class='total'><td colspan='4'>All weeks</td><td class='num'>" + money(tc) + "</td><td class='num'>" + money(ts) + "</td><td class='num'>" + pct(overall) + "</td><td colspan='2'></td></tr></table>";
+}
+function renderMenu(){
+  var el = $("menu-list"), s = state.settings;
+  if(state.menu.length === 0){ el.innerHTML = "<p class='hint'>No menu items yet.</p>"; return; }
+  var rows = state.menu.map(function(m){
+    var c = calcMenuItem(m);
+    var flag = c.pct > num(s.fcMax) ? "<span class='pill r'>Above band</span>" : "<span class='pill g'>OK</span>";
+    return "<tr><td>" + esc(m.name) + "</td><td class='num'>" + money(c.cost) + "</td><td class='num'>" + money(c.price) + "</td><td class='num'><b>" + pct(c.pct) + "</b></td><td class='num'>" + money(c.margin) + "</td><td>" + (c.price > 0 ? flag : "—") + "</td>" +
+      "<td class='no-print'><button class='btn small secondary' onclick='editMenu(\"" + m.id + "\")'>Edit</button> <button class='btn danger' onclick='delMenu(\"" + m.id + "\")'>Delete</button></td></tr>";
+  }).join("");
+  el.innerHTML = "<table><tr><th>Item</th><th class='num'>Plate cost</th><th class='num'>Price</th><th class='num'>Food %</th><th class='num'>Margin</th><th>Status</th><th class='no-print'></th></tr>" + rows + "</table>";
+}
+function renderExpenses(){
+  var sel = $("ex-cat");
+  if(sel.options.length === 0){ sel.innerHTML = CATEGORIES.map(function(c){ return "<option value='" + c.key + "'>" + esc(c.label) + " (" + esc(c.line) + ")</option>"; }).join(""); }
+  var el = $("expense-list");
+  if(state.expenses.length === 0){ el.innerHTML = "<p class='hint'>No standalone expenses yet.</p>"; }
+  else {
+    var sorted = state.expenses.slice().sort(function(a,b){ return String(b.date).localeCompare(String(a.date)); });
+    var tot = 0;
+    var rows = sorted.map(function(x){ tot = r2(tot + Math.max(0, num(x.amount)));
+      return "<tr><td>" + fmtDate(x.date) + "</td><td>" + esc(x.desc) + "</td><td>" + esc(catByKey(x.category).label) + "</td><td class='num'>" + money(x.amount) + "</td>" +
+      "<td class='no-print'><button class='btn small secondary' onclick='editExpense(\"" + x.id + "\")'>Edit</button> <button class='btn danger' onclick='delExpense(\"" + x.id + "\")'>Delete</button></td></tr>"; }).join("");
+    el.innerHTML = "<table><tr><th>Date</th><th>Description</th><th>Category</th><th class='num'>Amount</th><th class='no-print'></th></tr>" + rows +
+      "<tr class='total'><td colspan='3'>Total standalone expenses</td><td class='num'>" + money(tot) + "</td><td class='no-print'></td></tr></table>";
+  }
+  var lines = taxTotals(state);
+  var order = ["Part III — Cost of goods sold","Line 8 — Advertising","Line 9 — Car and truck expenses","Line 10 — Commissions and fees","Line 11 — Contract labor","Line 15 — Insurance (other than health)","Line 18 — Office expenses","Line 20b — Rent, other business property","Line 21 — Repairs and maintenance","Line 22 — Supplies","Line 23 — Taxes and licenses","Line 25 — Utilities","Line 27a — Other expenses"];
+  var grand = 0, trows = "";
+  order.forEach(function(l){ if(lines[l]){ grand = r2(grand + lines[l]); trows += "<tr><td>" + esc(l) + "</td><td class='num'>" + money(lines[l]) + "</td></tr>"; } });
+  Object.keys(lines).forEach(function(l){ if(order.indexOf(l) === -1){ grand = r2(grand + lines[l]); trows += "<tr><td>" + esc(l) + "</td><td class='num'>" + money(lines[l]) + "</td></tr>"; } });
+  $("tax-summary").innerHTML = trows ? "<table><tr><th>Schedule C line</th><th class='num'>Total</th></tr>" + trows + "<tr class='total'><td>Grand total (COGS + expenses)</td><td class='num'>" + money(grand) + "</td></tr></table>" : "<p class='hint'>Nothing to summarize yet.</p>";
+}
+function renderSettings(){
+  var s = state.settings;
+  $("st-truck").value = s.truckName || ""; $("st-target").value = s.targetPerHour;
+  $("st-cardfee").value = s.cardFeePct; $("st-cardshare").value = s.cardSharePct; $("st-laborrate").value = s.laborRate;
+  $("st-fcmin").value = s.fcMin; $("st-fcmax").value = s.fcMax;
+}
+function renderAll(){ renderDashboard(); renderEvents(); renderRankings(); renderWeeks(); renderMenu(); renderExpenses(); renderSettings(); }
+
+/* ================= forms & actions ================= */
+function switchTab(name){
+  var btns = document.querySelectorAll("#topnav button");
+  btns.forEach(function(b){ b.classList.toggle("active", b.getAttribute("data-tab") === name); });
+  var tabs = document.querySelectorAll(".tab");
+  tabs.forEach(function(t){ t.classList.toggle("active", t.id === "tab-" + name); });
+}
+document.querySelectorAll("#topnav button").forEach(function(b){ b.addEventListener("click", function(){ switchTab(b.getAttribute("data-tab")); }); });
+
+function resetEventForm(){ $("event-form").reset(); $("ev-id").value = ""; $("ev-submit").textContent = "Add event"; $("ev-cancel").style.display = "none";
+  $("ev-cardshare").value = state.settings.cardSharePct; $("ev-cardfee").value = state.settings.cardFeePct; $("ev-laborrate").value = state.settings.laborRate; }
+$("event-form").addEventListener("submit", function(ev){
+  ev.preventDefault();
+  var rec = { id: $("ev-id").value || uid(), name: $("ev-name").value.trim(), date: $("ev-date").value, location: $("ev-location").value.trim(),
+    hours: num($("ev-hours").value), sales: num($("ev-sales").value), foodCost: num($("ev-food").value), boothFee: num($("ev-booth").value),
+    commissary: num($("ev-commissary").value), propane: num($("ev-propane").value), fuel: num($("ev-fuel").value),
+    laborHours: num($("ev-laborhours").value), laborRate: num($("ev-laborrate").value),
+    cardSharePct: num($("ev-cardshare").value), cardFeePct: num($("ev-cardfee").value), otherCost: num($("ev-other").value) };
+  if(!rec.name || !rec.date){ alert("Give the event a name and a date."); return; }
+  var ix = state.events.findIndex(function(e){ return e.id === rec.id; });
+  if(ix >= 0) state.events[ix] = rec; else state.events.push(rec);
+  save(); renderAll(); resetEventForm();
+});
+window.editEvent = function(id){ var e = state.events.find(function(x){ return x.id === id; }); if(!e) return;
+  $("ev-id").value = e.id; $("ev-name").value = e.name; $("ev-date").value = e.date; $("ev-location").value = e.location || "";
+  $("ev-hours").value = e.hours; $("ev-sales").value = e.sales; $("ev-food").value = e.foodCost; $("ev-booth").value = e.boothFee;
+  $("ev-commissary").value = e.commissary; $("ev-propane").value = e.propane; $("ev-fuel").value = e.fuel;
+  $("ev-laborhours").value = e.laborHours; $("ev-laborrate").value = e.laborRate; $("ev-cardshare").value = e.cardSharePct;
+  $("ev-cardfee").value = e.cardFeePct; $("ev-other").value = e.otherCost;
+  $("ev-submit").textContent = "Save changes"; $("ev-cancel").style.display = ""; switchTab("events"); window.scrollTo(0,0); };
+window.delEvent = function(id){ if(!confirm("Delete this event?")) return; state.events = state.events.filter(function(e){ return e.id !== id; }); save(); renderAll(); };
+$("ev-cancel").addEventListener("click", resetEventForm);
+
+function resetWeekForm(){ $("week-form").reset(); $("wk-id").value = ""; $("wk-submit").textContent = "Add week"; $("wk-cancel").style.display = "none"; }
+$("week-form").addEventListener("submit", function(ev){
+  ev.preventDefault();
+  var rec = { id: $("wk-id").value || uid(), start: $("wk-start").value, bi: num($("wk-bi").value), purchases: num($("wk-purch").value), ei: num($("wk-ei").value), sales: num($("wk-sales").value) };
+  if(!rec.start){ alert("Pick the week-start date."); return; }
+  var ix = state.weeks.findIndex(function(w){ return w.id === rec.id; });
+  if(ix >= 0) state.weeks[ix] = rec; else state.weeks.push(rec);
+  save(); renderAll(); resetWeekForm();
+});
+window.editWeek = function(id){ var w = state.weeks.find(function(x){ return x.id === id; }); if(!w) return;
+  $("wk-id").value = w.id; $("wk-start").value = w.start; $("wk-bi").value = w.bi; $("wk-purch").value = w.purchases; $("wk-ei").value = w.ei; $("wk-sales").value = w.sales;
+  $("wk-submit").textContent = "Save changes"; $("wk-cancel").style.display = ""; switchTab("foodcost"); window.scrollTo(0,0); };
+window.delWeek = function(id){ if(!confirm("Delete this week?")) return; state.weeks = state.weeks.filter(function(w){ return w.id !== id; }); save(); renderAll(); };
+$("wk-cancel").addEventListener("click", resetWeekForm);
+
+function resetMenuForm(){ $("menu-form").reset(); $("mi-id").value = ""; $("mi-submit").textContent = "Add item"; $("mi-cancel").style.display = "none"; }
+$("menu-form").addEventListener("submit", function(ev){
+  ev.preventDefault();
+  var rec = { id: $("mi-id").value || uid(), name: $("mi-name").value.trim(), plateCost: num($("mi-cost").value), price: num($("mi-price").value) };
+  if(!rec.name){ alert("Give the item a name."); return; }
+  var ix = state.menu.findIndex(function(m){ return m.id === rec.id; });
+  if(ix >= 0) state.menu[ix] = rec; else state.menu.push(rec);
+  save(); renderAll(); resetMenuForm();
+});
+window.editMenu = function(id){ var m = state.menu.find(function(x){ return x.id === id; }); if(!m) return;
+  $("mi-id").value = m.id; $("mi-name").value = m.name; $("mi-cost").value = m.plateCost; $("mi-price").value = m.price;
+  $("mi-submit").textContent = "Save changes"; $("mi-cancel").style.display = ""; switchTab("menu"); window.scrollTo(0,0); };
+window.delMenu = function(id){ if(!confirm("Delete this menu item?")) return; state.menu = state.menu.filter(function(m){ return m.id !== id; }); save(); renderAll(); };
+$("mi-cancel").addEventListener("click", resetMenuForm);
+
+function resetExpenseForm(){ $("expense-form").reset(); $("ex-id").value = ""; $("ex-submit").textContent = "Add expense"; $("ex-cancel").style.display = "none"; }
+$("expense-form").addEventListener("submit", function(ev){
+  ev.preventDefault();
+  var rec = { id: $("ex-id").value || uid(), date: $("ex-date").value, desc: $("ex-desc").value.trim(), category: $("ex-cat").value, amount: num($("ex-amount").value) };
+  if(!rec.date || !rec.desc){ alert("Give the expense a date and a description."); return; }
+  var ix = state.expenses.findIndex(function(x){ return x.id === rec.id; });
+  if(ix >= 0) state.expenses[ix] = rec; else state.expenses.push(rec);
+  save(); renderAll(); resetExpenseForm();
+});
+window.editExpense = function(id){ var x = state.expenses.find(function(e){ return e.id === id; }); if(!x) return;
+  $("ex-id").value = x.id; $("ex-date").value = x.date; $("ex-desc").value = x.desc; $("ex-cat").value = x.category; $("ex-amount").value = x.amount;
+  $("ex-submit").textContent = "Save changes"; $("ex-cancel").style.display = ""; switchTab("expenses"); window.scrollTo(0,0); };
+window.delExpense = function(id){ if(!confirm("Delete this expense?")) return; state.expenses = state.expenses.filter(function(x){ return x.id !== id; }); save(); renderAll(); };
+$("ex-cancel").addEventListener("click", resetExpenseForm);
+
+$("st-save").addEventListener("click", function(){
+  state.settings.truckName = $("st-truck").value.trim();
+  state.settings.targetPerHour = num($("st-target").value);
+  state.settings.cardFeePct = num($("st-cardfee").value);
+  state.settings.cardSharePct = Math.min(100, Math.max(0, num($("st-cardshare").value)));
+  state.settings.laborRate = num($("st-laborrate").value);
+  state.settings.fcMin = num($("st-fcmin").value);
+  state.settings.fcMax = num($("st-fcmax").value);
+  save(); renderAll(); resetEventForm();
+  $("backup-msg").textContent = "Settings saved.";
+});
+
+/* ================= backup ================= */
+$("btn-export").addEventListener("click", function(){
+  var blob = new Blob([JSON.stringify(state, null, 2)], {type:"application/json"});
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = "truckledger-backup.json"; a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
+  $("backup-msg").textContent = "Backup downloaded.";
+});
+$("btn-import").addEventListener("click", function(){ $("file-import").click(); });
+$("file-import").addEventListener("change", function(){
+  var f = this.files && this.files[0]; if(!f) return;
+  var reader = new FileReader();
+  reader.onload = function(){
+    try{
+      var parsed = JSON.parse(reader.result);
+      if(!parsed || !parsed.settings || !Array.isArray(parsed.events) || !Array.isArray(parsed.weeks) || !Array.isArray(parsed.menu) || !Array.isArray(parsed.expenses)){ throw new Error("shape"); }
+      state = parsed; save(); renderAll(); resetEventForm();
+      $("backup-msg").textContent = "Backup imported — you're looking at your restored data.";
+    }catch(err){ $("backup-msg").textContent = "That file doesn't look like a TruckLedger backup — nothing was changed."; }
+    $("file-import").value = "";
+  };
+  reader.readAsText(f);
+});
+$("btn-demo").addEventListener("click", function(){ if(!confirm("Replace everything with the demo data?")) return; state = demoState(); save(); renderAll(); resetEventForm(); $("backup-msg").textContent = "Demo data loaded."; });
+$("btn-clear-demo").addEventListener("click", function(){
+  var demo = demoState();
+  function idSet(list){ var s = {}; list.forEach(function(x){ s[x.id] = 1; }); return s; }
+  var de = idSet(demo.events), dw = idSet(demo.weeks), dm = idSet(demo.menu), dx = idSet(demo.expenses);
+  var n = state.events.filter(function(x){ return de[x.id]; }).length + state.weeks.filter(function(x){ return dw[x.id]; }).length
+        + state.menu.filter(function(x){ return dm[x.id]; }).length + state.expenses.filter(function(x){ return dx[x.id]; }).length;
+  if(!n){ $("backup-msg").textContent = "No demo data found — nothing was removed. Every record is your own."; return; }
+  if(!confirm("Clear the demo data only (" + n + " sample records)? Your own events, weeks, menu items, expenses, and settings stay.")) return;
+  state.events = state.events.filter(function(x){ return !de[x.id]; });
+  state.weeks = state.weeks.filter(function(x){ return !dw[x.id]; });
+  state.menu = state.menu.filter(function(x){ return !dm[x.id]; });
+  state.expenses = state.expenses.filter(function(x){ return !dx[x.id]; });
+  save(); renderAll(); resetEventForm(); $("backup-msg").textContent = "Demo data cleared — your own records were kept.";
+});
+$("btn-clear").addEventListener("click", function(){ if(!confirm("Erase EVERYTHING — all events, weeks, menu items, and expenses, and reset settings to defaults? This cannot be undone.")) return;
+  state.events = []; state.weeks = []; state.menu = []; state.expenses = []; state.settings = defaultSettings(); save(); renderAll(); resetEventForm(); $("backup-msg").textContent = "Everything erased. The book is empty."; });
+
+/* ================= init ================= */
+load();
+renderAll();
+resetEventForm();
+
+/* ================= Legal — Terms of Use acceptance (catalog pattern v1.0) ================= */
+var TERMS_VERSION = "1.0";
+var LEGAL_APP_NAME = "TruckLedger";
+var LEGAL_HAS_DISCLAIMER = true;
+var LEGAL_TERMS_HTML = "<h3>Terms of Use \u2014 White Wolf Digital Apps</h3><p><b>Version 1.0 (DRAFT \u2014 pending attorney review)</b></p><p><b>Seller: White Wolf Tree Service LLC, selling digital products under the name \"White Wolf Digital\"</b></p><p><b>Contact: whitewolfoklahoma@gmail.com</b></p><h4>1. What you're buying</h4><p>Our apps (including ForgeFit AI, ForgeKitchen, TreeBid Pro, SnowBid,</p><p>WashPrice Pro, RoofSquares, JobProfit Tracker, PastureLedger, and the other</p><p>titles sold under White Wolf Digital) are single-file software tools. When</p><p>you buy one, you are buying a <b>license to use the file</b>, not ownership of</p><p>the software itself.</p><h4>2. Your license</h4><ul><li>You may use the app for your own personal or business work.</li><li>You may open it on your own devices (phone, tablet, computer) and move your</li></ul><p>  own data between them using the app's built-in backup/export tools.</p><ul><li>You may <b>not</b> resell, redistribute, give away, upload, or share the app</li></ul><p>  file (or a copy of it) with anyone else \u2014 including posting it online,</p><p>  bundling it with other products, or selling access to it.</p><ul><li>You may <b>not</b> claim the app as your own work, remove its branding or</li></ul><p>  notices, or use it to build a competing product for resale.</p><ul><li>One purchase = one buyer. A business purchase covers the buyer and their</li></ul><p>  own employees using it for that business's work; it does not cover other</p><p>  businesses.</p><h4>3. Your data stays yours \u2014 and stays on your device</h4><ul><li>The current versions of our apps run <b>entirely on your device</b>. They have</li></ul><p>  no accounts, no sign-in, no analytics, and they collect, transmit, and store</p><p>  <b>none</b> of your information on any server. We never see your data.</p><ul><li>Your records are stored in your browser/app storage on your device. **You</li></ul><p>  are responsible for backing them up** using the app's export tools. If you</p><p>  clear your browser data, lose your device, or uninstall the app, your</p><p>  records may be permanently lost, and we cannot recover them \u2014 we never had</p><p>  a copy.</p><ul><li>Files you export (backups, quotes, PDFs) are under your control. Where you</li></ul><p>  store or send them is up to you.</p><h4>4. Estimates are tools, not guarantees</h4><p>Every number our apps produce \u2014 bids, prices, costs, calorie targets,</p><p>projections, schedules, totals \u2014 is an **estimate generated from the</p><p>information you enter and the settings you choose**. Outputs are aids for</p><p>your own judgment, not guarantees of price, profit, outcome, or result. You</p><p>are responsible for checking any output before relying on it (see also the</p><p>disclaimer that applies to your app: Health Disclaimer for fitness/nutrition</p><p>apps, Estimator Disclaimer for contractor tools). If an input is wrong, the</p><p>output will be wrong.</p><h4>5. Acceptable use</h4><p>Don't use the apps to break the law, infringe anyone's rights, or</p><p>misrepresent quotes, invoices, or records to your own customers. For the</p><p>fitness apps, the guardrails in the app (healthy-rate limits, calorie floor)</p><p>are part of the product \u2014 don't treat the app as a way around them.</p><h4>6. Provided \"as is\"</h4><p>The apps are provided **\"as is\" and \"as available,\" without warranties of</p><p>any kind**, express or implied \u2014 including merchantability, fitness for a</p><p>particular purpose, accuracy of calculations, and uninterrupted or</p><p>error-free operation \u2014 to the maximum extent allowed by law. Software has</p><p>bugs; browsers change; we work to fix problems but do not promise any app is</p><p>error-free or will work on every device or browser forever.</p><h4>7. Limitation of liability</h4><p>To the maximum extent allowed by law:</p><ul><li>We are **not liable for indirect, incidental, special, or consequential</li></ul><p>  damages** \u2014 including lost profits, lost or mispriced jobs, lost data, or</p><p>  business interruption \u2014 arising from use of the apps.</p><ul><li>Our total liability for any claim connected to an app is limited to the</li></ul><p>  <b>amount you paid for that app</b>.</p><ul><li>Nothing in these terms limits liability that cannot legally be limited.</li></ul><h4>8. Refunds</h4><p>Refunds are handled **by the storefront you bought from, under that</p><p>storefront's policy** \u2014 Gumroad's refund policy for Gumroad purchases, and</p><p>Google Play's refund policy for Play purchases. These terms do not add to,</p><p>replace, or override the storefront's refund rules. If a file is defective</p><p>and won't open, contact us at whitewolfoklahoma@gmail.com and we'll fix or</p><p>replace the file.</p><h4>9. Updates and changes to these terms</h4><ul><li>We may release updated versions of an app. Updates may add, change, or</li></ul><p>  remove features.</p><ul><li>We may update these terms. The version you agreed to is recorded in the</li></ul><p>  app (version number and date) at first-run acceptance. If terms change,</p><p>  the app may ask you to accept the new version once on next open. Updated</p><p>  terms apply going forward, not retroactively.</p><ul><li>If you don't agree to an updated version of the terms, stop using the app.</li></ul><h4>10. Governing law</h4><p>These terms are governed by the laws of the <b>State of Oklahoma</b>, USA.</p><p>(Attorney to confirm governing law and venue before publication.)</p><h4>11. Contact</h4><p>White Wolf Tree Service LLC (White Wolf Digital) \u2014</p><p>whitewolfoklahoma@gmail.com.</p><h4>CONNECTED FEATURES \u2014 takes effect only when these features ship</h4><p>*The sections below apply only to future connected features (device sync via</p><p>Health Connect, AI voice logging, and the AI Goal Preview in ForgeFit). They</p><p>do not apply to the current offline versions, which never transmit data.*</p><ul><li><b>Opt-in only.</b> Connected features are off by default. Each one asks for</li></ul><p>  your separate, explicit consent \u2014 on its own consent screen, in plain</p><p>  language \u2014 before anything leaves your device. Declining never disables</p><p>  the app's offline features.</p><ul><li><b>What gets sent.</b> Only what the consent screen names, only when you use</li></ul><p>  the feature: for example, a meal description (text, or audio only if cloud</p><p>  transcription is on) for AI voice logging, or the single photo you choose</p><p>  for an AI Goal Preview.</p><ul><li><b>No retention by us.</b> Our relay service passes your request to the named</li></ul><p>  AI provider and keeps nothing \u2014 no copies of your photos, audio,</p><p>  transcripts, or entries are stored on our servers. Provider handling is</p><p>  described on the consent screen and in the Privacy Policy.</p><ul><li><b>Health data stays on the device.</b> Device sync (Health Connect) reads</li></ul><p>  your health data on your phone and stores it in the app on your phone. It</p><p>  is not uploaded to us.</p><ul><li><b>Allowances.</b> Some connected features run on third-party AI services we</li></ul><p>  pay for per use, so they may include a monthly allowance described in the</p><p>  app (for example, a set number of AI previews or voice entries per month),</p><p>  with optional additional credits. Allowances and pricing will be shown in</p><p>  the app before you use the feature; they are not a subscription unless the</p><p>  app says so in plain words.</p><ul><li><b>Permissions.</b> Connected features may request device permissions (such</li></ul><p>  as Health Connect access or the microphone) at the moment you first use</p><p>  them. You can revoke permissions any time in your device settings; the</p><p>  related feature will simply stop working.</p>";
+var LEGAL_DISCLAIMER_HTML = "<h3>Estimator Disclaimer \u2014 Contractor &amp; Trade Tools</h3><p>**Applies to: TreeBid Pro, SnowBid, WashPrice Pro, RoofSquares, JobProfit</p><p>Tracker, FieldForms Toolkit, PaintPro, FenceDeck, MarketMaker, and the other</p><p>estimating/pricing tools sold under White Wolf Digital \u2014 including bundles</p><p>that contain them.**</p><h4>Estimating aids, not finished quotes</h4><ul><li>These apps are <b>estimating and record-keeping aids</b>. Every bid, price,</li></ul><p>  cost, measurement, and total they produce is an **estimate based on the</p><p>  information and rates you enter**.</p><ul><li>**You \u2014 the business owner \u2014 are responsible for verifying everything</li></ul><p>  before you quote a customer:** measurements and quantities, site</p><p>  conditions, your current material and labor costs, your rates and margins,</p><p>  taxes, permit and license requirements, disposal rules, and any contract</p><p>  terms.</p><ul><li>Default rates, presets, and sample data included in the apps are starting</li></ul><p>  points only. They are not market prices, not industry standards, and not</p><p>  a recommendation of what you should charge.</p><ul><li>A saved quote keeps the prices in effect when you created it (price</li></ul><p>  snapshot). Changing your presets later does not change saved quotes \u2014</p><p>  and a saved quote is still your responsibility to review before sending.</p><h4>Specific tools</h4><ul><li><b>TreeBid Pro:</b> tree work is dangerous and site-specific. Difficulty</li></ul><p>  factors and presets cannot see the actual tree, lean, rot, targets, or</p><p>  access. Inspect every job in person before final pricing. The \"Invoice</p><p>  with Wave\" feature is an open-and-paste handoff \u2014 TreeBid does not</p><p>  connect to Wave, and the invoice you send from Wave is yours.</p><ul><li><b>RoofSquares / measurement tools:</b> confirm roof measurements and pitch</li></ul><p>  in person or by your usual method before ordering materials.</p><ul><li><b>SnowBid / seasonal tools:</b> route times, snowfall amounts, and service</li></ul><p>  pricing vary by storm and site; seasonal contracts are your agreement</p><p>  with your customer, on your terms.</p><ul><li><b>JobProfit Tracker:</b> profit figures depend on the costs you enter.</li></ul><p>  The app is not accounting or tax software and does not replace your</p><p>  bookkeeper or accountant.</p><h4>Bottom line</h4><p>If an output and your judgment disagree, trust your judgment \u2014 then fix the</p><p>input. We are not responsible for jobs won, lost, or mispriced based on app</p><p>outputs, within the limits of the Terms of Use.</p>";
+(function(){
+  var lst = document.createElement("style");
+  lst.textContent = "@media print{ #legalOverlay{ display:none !important; } }";
+  document.head.appendChild(lst);
+})();
+function sanitizeLegal(v){
+  if(!v || typeof v !== "object") return null;
+  if(typeof v.termsVersion !== "string" || typeof v.acceptedDate !== "string") return null;
+  return { termsVersion: v.termsVersion.slice(0, 10), acceptedDate: v.acceptedDate.slice(0, 40), disclaimerShown: !!v.disclaimerShown };
+}
+function legalRecord(){
+  try{ var s = state; return (s && s.legal) ? sanitizeLegal(s.legal) : null; }catch(e){ return null; }
+}
+function legalVersionCmp(a, b){
+  var pa = String(a).split("."), pb = String(b).split(".");
+  for(var i = 0; i < 3; i++){ var d = (parseInt(pa[i], 10) || 0) - (parseInt(pb[i], 10) || 0); if(d) return d; }
+  return 0;
+}
+function legalAcceptLine(){
+  var rec = legalRecord();
+  if(rec && rec.acceptedDate) return "You agreed to Terms v" + rec.termsVersion + " on " + rec.acceptedDate.slice(0, 10) + ".";
+  return "No Terms acceptance is recorded on this device yet \u2014 the current Terms will be shown for your agreement.";
+}
+function legalSectionHTML(){
+  var h = '<div style="border-top:2px solid rgba(127,127,127,.35);margin-top:20px;padding-top:14px;">'
+    + '<h2>Legal</h2>'
+    + '<p>' + legalAcceptLine() + '</p>'
+    + '<h3>Terms of Use (v' + TERMS_VERSION + ')</h3>'
+    + '<div style="max-height:340px;overflow-y:auto;border:1px solid rgba(127,127,127,.4);border-radius:8px;padding:10px 14px;font-size:14px;line-height:1.55;">' + LEGAL_TERMS_HTML + '</div>';
+  if(LEGAL_HAS_DISCLAIMER){
+    h += '<h3>Estimator Disclaimer</h3>'
+      + '<div style="max-height:260px;overflow-y:auto;border:1px solid rgba(127,127,127,.4);border-radius:8px;padding:10px 14px;font-size:14px;line-height:1.55;">' + LEGAL_DISCLAIMER_HTML + '</div>';
+  }
+  h += '<h3>Privacy</h3>'
+    + '<p>This app collects no data. It has no accounts, no sign-in, no analytics, and no server \u2014 everything you enter is stored only on this device, in this browser\u2019s storage, and nothing is transmitted anywhere. Files you export (backups, quotes, prints) are under your control. You are responsible for backing up your records with the app\u2019s export tools.</p>'
+    + '<p>Sold by White Wolf Tree Service LLC (White Wolf Digital) \u2014 whitewolfoklahoma@gmail.com</p>'
+    + '</div>';
+  return h;
+}
+function legalFillSection(){
+  var el = document.getElementById("legalSection");
+  if(!el) return;
+  var sig = legalAcceptLine();
+  if(el.getAttribute("data-legal-filled") === sig) return;
+  el.innerHTML = legalSectionHTML(); el.setAttribute("data-legal-filled", sig);
+}
+function legalRefreshSection(){
+  var el = document.getElementById("legalSection");
+  if(el){ el.innerHTML = legalSectionHTML(); el.setAttribute("data-legal-filled", legalAcceptLine()); }
+}
+function legalShowOverlay(isUpdate){
+  if(document.getElementById("legalOverlay")) return;
+  var ov = document.createElement("div");
+  ov.id = "legalOverlay";
+  ov.setAttribute("style", "position:fixed;inset:0;z-index:99999;background:rgba(8,10,14,.74);overflow-y:auto;padding:20px 12px;display:flex;align-items:flex-start;justify-content:center;");
+  var discBtn = LEGAL_HAS_DISCLAIMER ? '<button type="button" id="legalReadDisc" style="min-height:44px;padding:10px 14px;border-radius:10px;border:1px solid #9aa4b2;background:#ffffff;color:#1c2733;font-size:15px;cursor:pointer;">Read the Estimator Disclaimer</button>' : '';
+  var checkLabel = LEGAL_HAS_DISCLAIMER ? "I have read the disclaimer and I agree to the Terms of Use" : "I have read and I agree to the Terms of Use";
+  ov.innerHTML = '<div style="background:#ffffff;color:#1c2733;max-width:560px;width:100%;border-radius:14px;padding:22px 20px;box-shadow:0 18px 50px rgba(0,0,0,.45);font-size:15px;line-height:1.55;">'
+    + '<h2 style="margin:0 0 6px;font-size:21px;">' + LEGAL_APP_NAME + ' \u2014 Terms of Use</h2>'
+    + (isUpdate ? '<p style="background:#fdf3d7;border:1px solid #e4cf8a;border-radius:8px;padding:8px 10px;"><b>Our terms were updated (v' + TERMS_VERSION + ').</b></p>' : '')
+    + '<p style="font-size:16px;"><b>Your data stays on your device.</b><br><b>Estimates are aids, not guarantees.</b><br><b>You\'re responsible for checking outputs before you rely on them.</b></p>'
+    + '<p>The full Terms' + (LEGAL_HAS_DISCLAIMER ? ' and Disclaimer are' : ' are') + ' one tap away, now and any time in Settings \u2192 Legal.</p>'
+    + '<div id="legalReader" style="display:none;max-height:44vh;overflow-y:auto;border:1px solid #d5dbe3;border-radius:10px;padding:10px 14px;margin:10px 0;font-size:14px;"></div>'
+    + '<p style="display:flex;gap:8px;flex-wrap:wrap;"><button type="button" id="legalReadTerms" style="min-height:44px;padding:10px 14px;border-radius:10px;border:1px solid #9aa4b2;background:#ffffff;color:#1c2733;font-size:15px;cursor:pointer;">Read the full Terms</button>' + discBtn + '</p>'
+    + '<label style="display:flex;gap:10px;align-items:flex-start;margin:12px 0;cursor:pointer;"><input type="checkbox" id="legalCheck" style="width:22px;height:22px;min-width:22px;margin-top:1px;cursor:pointer;"><span>' + checkLabel + '</span></label>'
+    + '<button type="button" id="legalAgree" disabled style="min-height:52px;width:100%;border:0;border-radius:10px;background:#1f5fa8;color:#ffffff;font-size:17px;font-weight:700;cursor:pointer;opacity:.55;">I Agree</button>'
+    + '<p style="font-size:13px;color:#5a6675;margin-bottom:0;">Your records stay loaded behind this screen and are never deleted or locked, whether or not you agree now.</p>'
+    + '</div>';
+  document.body.appendChild(ov);
+  var reader = ov.querySelector("#legalReader");
+  var showing = "";
+  function toggleReader(kind){
+    if(showing === kind){ reader.style.display = "none"; showing = ""; return; }
+    reader.innerHTML = kind === "terms" ? LEGAL_TERMS_HTML : LEGAL_DISCLAIMER_HTML;
+    reader.style.display = "block"; showing = kind;
+    reader.scrollTop = 0;
+  }
+  ov.querySelector("#legalReadTerms").addEventListener("click", function(){ toggleReader("terms"); });
+  var db = ov.querySelector("#legalReadDisc");
+  if(db) db.addEventListener("click", function(){ toggleReader("disc"); });
+  var legalChk = ov.querySelector("#legalCheck");
+  var legalAgreeBtn = ov.querySelector("#legalAgree");
+  legalChk.addEventListener("change", function(){ legalAgreeBtn.disabled = !legalChk.checked; legalAgreeBtn.style.opacity = legalChk.checked ? "1" : ".55"; });
+  legalAgreeBtn.addEventListener("click", function(){
+    if(!legalChk.checked) return;
+    try{ state.legal = { termsVersion: TERMS_VERSION, acceptedDate: new Date().toISOString(), disclaimerShown: LEGAL_HAS_DISCLAIMER }; save(); }catch(e){}
+    if(ov.parentNode) ov.parentNode.removeChild(ov);
+    legalRefreshSection();
+  });
+}
+function legalInit(){
+  legalFillSection();
+  var rec = legalRecord();
+  if(rec && legalVersionCmp(rec.termsVersion, TERMS_VERSION) >= 0) return;
+  legalShowOverlay(!!rec);
+}
+if(typeof MutationObserver !== "undefined"){
+  var legalObs = new MutationObserver(function(){ legalFillSection(); });
+  legalObs.observe(document.documentElement, { childList: true, subtree: true });
+}
+if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", function(){ setTimeout(legalInit, 30); });
+else setTimeout(legalInit, 30);
+
+</script>
+</body>
+</html>
